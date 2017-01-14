@@ -7,10 +7,9 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 import org.apache.log4j.{Level, Logger}
 
-import java.text.SimpleDateFormat
-import java.util.Date
-
 import org.apache.spark.sql.types._
+import com.github.nscala_time._
+
 
 object DataAnalysis {
   def main(args: Array[String]): Unit = {
@@ -19,31 +18,43 @@ object DataAnalysis {
     val rootlogger = Logger.getRootLogger().setLevel(Level.ERROR)
     val sqlcontext = new SQLContext(scontext)
 
-    import sqlcontext.implicits._
+    val format = new java.text.SimpleDateFormat("mm/dd/yyyy")
+    format.format(new java.util.Date())
 
-    case class Sale(Transaction_date: Date,
-                    Price: Int, Payment_Type: String, Name: String,
-                    City: String, State: String, Country: String,
-                    Account_Created: Date, Last_Login: Date, Latitude: Double, Longitude: Double)
+    val temp = sqlcontext.read.option("header","true").csv("SalesJan2009.csv")
+    val df = temp.selectExpr(
+      "cast(Transaction_date as date) Transaction_date",
+      "Product",
+      "cast(Price as int) Price",
+      "Payment_Type",
+      "Name",
+      "City",
+      "State",
+      "Country",
+      "cast(Account_Created as date) Account_Created",
+      "cast(Last_Login as date) Last_Login",
+      "cast(Latitude as float) Latitude",
+      "cast(Longitude as float) Longitude")
 
-    val simpleDateFormat: SimpleDateFormat = new SimpleDateFormat("mm/dd/yyyy HH:MM")
-
-    //UPLOAD THE FILE INTO SPARK
-    val SalesJan2009 = scontext.textFile("SalesJan2009.csv")
-      .map(_.split(","))
-      .map(value => Sale(simpleDateFormat.parse(value(0)), value(1).trim.toInt, value(2), value(3), value(4).trim.toLowerCase(),
-        value(5), value(6), simpleDateFormat.parse(value(7)), simpleDateFormat.parse(value(8)), value(9).trim.toDouble, value(10).trim.toDouble))
-
-    val df = sqlcontext.createDataFrame(SalesJan2009, )
+    df.printSchema()
 
     /* NUMBER OF PAYMENTS */
     println("---------------------------\n")
     println("NUMBER OF DIFFERENT PAYMENTS")
-    SalesJan2009.toDS()
-    print("---------------------------\n")
+    val PaymentNumb  = df.select("Payment_Type").distinct().count()
+    println(s"There is $PaymentNumb different types of payment")
+    println("---------------------------\n\n")
+
+
 
     /* SALES - FIRST HALF OF THE MONTH */
     println("\nSALES FOR THE FIRST HALF OF THE MONTH")
+
+    val date = ("1/1/2009").toString(Static)
+
+    df.select("Product").filter(
+      "Transaction_date" >= fmt
+    )
     print("---------------------------\n")
   }
 
