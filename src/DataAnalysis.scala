@@ -2,15 +2,15 @@
   * Created by mathiasedouin on 13/01/17.
   */
 
+import java.sql.Timestamp
+
 import org.apache.spark.sql._
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.functions._
 
-import com.github.nscala_time._
-import com.github.nscala_time.time._
-
-import java.sql.Timestamp
+import java.text.SimpleDateFormat
 
 object DataAnalysis {
   def main(args: Array[String]): Unit = {
@@ -21,7 +21,7 @@ object DataAnalysis {
 
     val temp = sqlcontext.read.option("header","true").csv("SalesJan2009.csv")
     val df = temp.selectExpr(
-      "cast(Transaction_date as Timestamp) Transaction_date",
+      "Transaction_date",
       "Product",
       "cast(Price as int) Price",
       "Payment_Type",
@@ -29,33 +29,43 @@ object DataAnalysis {
       "City",
       "State",
       "Country",
-      "cast(Account_Created as date) Account_Created",
-      "cast(Last_Login as date) Last_Login",
-      "cast(Latitude as float) Latitude",
-      "cast(Longitude as float) Longitude")
+      "Account_Created",
+      "Last_Login",
+      "Latitude",
+      "Longitude")
 
-    df.printSchema()
-    df.select("Transaction_date").show()
+    val ts = unix_timestamp(df.col("Transaction_date"),"MM/dd/yyyy hh:mm")
+      .cast("double")
+      .cast("timestamp")
+    val ac = unix_timestamp(df.col("Account_Created"),"MM/dd/yyyy hh:mm")
+      .cast("double")
+      .cast("timestamp")
+    val ll = unix_timestamp(df.col("Last_Login"),"MM/dd/yyyy hh:mm")
+      .cast("double")
+      .cast("timestamp")
+    df.drop("Transaction_date").drop("Account_Created").drop("Last_Login")
+    var df2 = df.withColumn("Transaction_date", ts).withColumn("Account_Created", ac).withColumn("Last_login", ll)
+    df2.createOrReplaceTempView("sales")
 
     /* NUMBER OF PAYMENTS */
     println("---------------------------\n")
     println("NUMBER OF DIFFERENT PAYMENTS")
     val PaymentNumb  = df.select("Payment_Type").distinct().count()
     println(s"There is $PaymentNumb different types of payment")
-    println("---------------------------\n\n")
-
+    println("---------------------------\n")
 
 
     /* SALES - FIRST HALF OF THE MONTH */
     println("\nSALES FOR THE FIRST HALF OF THE MONTH")
+    val datedeb = "0009-01-01"
+    val datefin = "0009-01-15"
+    val prod =  df2.select("Product").where(s"Transaction_date BETWEEN CAST('$datedeb' AS TIMESTAMP) AND CAST('$datefin' AS TIMESTAMP)").count()
+    println(s"There is $prod products sold between $datedeb and $datefin")
+    print("---------------------------\n")
 
+    /* SALES - FIRST HALF OF THE MONTH */
+    println("\nSALES FOR THE FIRST HALF OF THE MONTH")
 
-    val prod = df.select("Product")
-      .filter(s"Transaction_date >= 1/1/2009")
-      .filter(s"Transaction_date <= 1/15/2009")
-      .count()
-
-    println(s"There is $prod sold")
     print("---------------------------\n")
   }
 
