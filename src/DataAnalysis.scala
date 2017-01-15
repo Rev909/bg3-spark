@@ -45,10 +45,11 @@ object DataAnalysis {
       .cast("timestamp")
     df.drop("Transaction_date").drop("Account_Created").drop("Last_Login")
     var df2 = df.withColumn("Transaction_date", ts).withColumn("Account_Created", ac).withColumn("Last_login", ll)
+
     df2.createOrReplaceTempView("sales")
 
     /* NUMBER OF PAYMENTS */
-    println("---------------------------\n")
+    println("\n---------------------------\n")
     println("NUMBER OF DIFFERENT PAYMENTS")
     val PaymentNumb  = df.select("Payment_Type").distinct().count()
     println(s"There is $PaymentNumb different types of payment")
@@ -56,17 +57,28 @@ object DataAnalysis {
 
 
     /* SALES - FIRST HALF OF THE MONTH */
-    println("\nSALES FOR THE FIRST HALF OF THE MONTH")
+    println("SALES FOR THE FIRST HALF OF THE MONTH")
     val datedeb = "0009-01-01"
     val datefin = "0009-01-15"
-    val prod =  df2.select("Product").where(s"Transaction_date BETWEEN CAST('$datedeb' AS TIMESTAMP) AND CAST('$datefin' AS TIMESTAMP)").count()
-    println(s"There is $prod products sold between $datedeb and $datefin")
-    print("---------------------------\n")
+    val SalesHMonth =  df2.select("Product").where(s"Transaction_date BETWEEN CAST('$datedeb' AS TIMESTAMP) AND CAST('$datefin' AS TIMESTAMP)").count()
+    println(s"There is $SalesHMonth products sold between $datedeb and $datefin")
+    println("---------------------------\n")
 
-    /* SALES - FIRST HALF OF THE MONTH */
-    println("\nSALES FOR THE FIRST HALF OF THE MONTH")
+    /* PRODUCT 1 */
+    println("PRODUCT 1 : MORE VISA OR MASTERCARD ?")
+    df2.select("Payment_Type").where("Product = 'Product1'").groupBy("Payment_Type").count().orderBy(desc("count")).show()
+    println("---------------------------\n")
 
-    print("---------------------------\n")
+    /* AVG ACCOUNT_CREATED -> FIRST PURCHASE */
+    println("AVG TIME BETWEEN ACCOUNT CREATION AND PURCHASE")
+    val diffdate = datediff(df2.col("Transaction_date"), df2.col("Account_Created"))
+    val AvgDaysDF = df2.withColumn("DateDiff", diffdate).agg(mean("DateDiff")).collect()
+    var AvgDays = "Hello"
+    for (x <- AvgDaysDF) {
+      AvgDays = x.toString().replace("[","").replace("]","")
+    }
+    println(s"On average there is ${AvgDays.toDouble.toInt} days passing between account creation and first purchase")
+    println("---------------------------\n")
   }
 
 }
